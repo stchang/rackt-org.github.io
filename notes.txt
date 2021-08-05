@@ -1,0 +1,27 @@
+# How to build and this tic-tac-toe Rackt demo from scratch
+
+### install vite
+`sudo apt-get install vite`
+
+### go to repo root, check out branch and do npm install
+```
+cd rackt-org.github.io
+git checkout ttt
+npm install
+cd ..
+```
+
+### clone rackt repo (in the demo dir, cannot be one dir level up) and install it
+```
+git clone git@github.com:stchang/rackt
+raco pkg install rackt/
+```
+
+### compile demo app
+`racks src/app.rkt`
+
+### start server
+### note: `npm run dev` only starts local server not visible from web
+### need to add `--host`
+`npx vite --host dev.racketscript.org`
+

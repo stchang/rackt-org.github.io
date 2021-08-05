@@ -1,168 +1,166 @@
 #lang racketscript/base
 
-(require "./counter.rkt"
-         "./todo.rkt"
+;; This is the tutorial app from: https://reactjs.org/tutorial/tutorial.html
+
+;; import React from 'react';
+;; import ReactDOM from 'react-dom';
+;; import './index.css';
+(require ;racket/vector
+         racket/match
          rackt)
 
-(define (header props . ..)
-    (<el "header"
-        (<el "div" #:props ($/obj [ className "header-content" ])
-            (<el "img" #:props ($/obj [ src "https://raw.githubusercontent.com/rackt-org/rackt-org.github.io/master/logo.png" ]
-                                      [ className "logo" ]))
-            (<el "h1" (<el  "a" #:props ($/obj [ href "https://github.com/rackt-org/rackt" ]) "Rackt"))
-            (<el "p" "An ultrasmall (~70 loc) React wrapper written in "
-                (<el "a" #:props ($/obj [ href "https://github.com/vishesh/racketscript" ]) "RacketScript")))))
+;; class Square extends React.Component {
+;;   render() {
+;;     return (
+;;       <button className="square">
+;;         {/* TODO */}
+;;       </button>
+;;     );
+;;   }
+;; }
 
-(define (intro props . ..)
-    (<el "div"
-        (<el "p" "Rackt is a tiny but still powerful React wrapper that allows you to write functional components with React hooks, contexts, and so on.
-        Despite the fact Rackt is in the early development stage, you can already use it because it has only simple js interop under the hood.
-        In most cases Rackt doesn't change API of React and you can use all familiar functions as you've already used to.
-        Here is an example of a simple Rackt component:")
-        (<el "pre"
-            (<el "code" #:props ($/obj [ className "language-racket" ])
-                "(define (simple-component props . ..)
-    (<el \"div\" #:props ($/obj [ className \"some-class\" ]) \"some text\"))"))
+(define (Square props . ..)
+  (<el "button" #:props ($/obj [className "square"]
+                               [onClick #js.props.onClick])
+       #js.props.value))
 
-        (<el "p" (<el "code" "<el") " here is a simple alias for " (<el "code" "React.createElement") " function
-        that has optional " (<el "code" "#:props") " parameter so you can skip it if you want:")
-        (<el "pre"
-            (<el "code" #:props ($/obj [ className "language-racket" ])
-                "(define (simple-component props . ..)
-    (<el \"div\" \"some text\"))"))
-        (<el "p" "In the examples below you can see more complex components and apps (btw this site is written in Rackt as well).")))
+;; class Board extends React.Component {
+;;   renderSquare(i) {
+;;     return <Square />;
+;;   }
 
-(define (counter-example props . ..)
-    (<el "div" #:props ($/obj [ className "example" ])
-        (<el "div"
-            (<el "h3" "Counter")
-            (<el counter))
-        (<el "div"
-            (<el "h3" "Source code")
-            (<el "pre" (<el "code" #:props ($/obj [ className "language-racket"]) counter-source-code)))))
+;;   render() {
+;;     const status = 'Next player: X';
 
-(define (todo-example props . ..)
-    (<el "div" #:props ($/obj [ className "example" ])
-        (<el "div"
-            (<el "h3" "Todo app")
-            (<el todo-app))
-        (<el "div"
-            (<el "h3" "Source code")
-            (<el "pre" (<el "code" #:props ($/obj [ className "language-racket"]) todo-source-code)))))
+;;     return (
+;;       <div>
+;;         <div className="status">{status}</div>
+;;         <div className="board-row">
+;;           {this.renderSquare(0)}
+;;           {this.renderSquare(1)}
+;;           {this.renderSquare(2)}
+;;         </div>
+;;         <div className="board-row">
+;;           {this.renderSquare(3)}
+;;           {this.renderSquare(4)}
+;;           {this.renderSquare(5)}
+;;         </div>
+;;         <div className="board-row">
+;;           {this.renderSquare(6)}
+;;           {this.renderSquare(7)}
+;;           {this.renderSquare(8)}
+;;         </div>
+;;       </div>
+;;     );
+;;   }
+;; }
 
-(define (app props . ..)
-    (<el "div"
-        #:props ($/obj [ className "container" ])
-            (<el header)
-            (<el intro)
-            (<el "h2" "Examples")
-            (<el counter-example)
-            (<el todo-example)))
 
-(define todo-source-code "#lang racketscript/base
+;; function calculateWinner(squares) {
+;;   const lines = [
+;;     [0, 1, 2],
+;;     [3, 4, 5],
+;;     [6, 7, 8],
+;;     [0, 3, 6],
+;;     [1, 4, 7],
+;;     [2, 5, 8],
+;;     [0, 4, 8],
+;;     [2, 4, 6],
+;;   ];
+;;   for (let i = 0; i < lines.length; i++) {
+;;     const [a, b, c] = lines[i];
+;;     if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
+;;       return squares[a];
+;;     }
+;;   }
+;;   return null;
+;; }
+(define (calculateWinner sqs)
+  (define LINES
+    '((0 1 2)
+      (3 4 5)
+      (6 7 8)
+      (0 3 6)
+      (1 4 7)
+      (2 5 8)
+      (0 4 8)
+      (2 4 6)))
+  (for/or ([L LINES])
+    (match-define (list a b c) L)
+    (and (not (equal? ($/typeof ($ sqs a)) #js"undefined"))
+         (equal? ($ sqs a) ($ sqs b))
+         (equal? ($ sqs b) ($ sqs c))
+         ($ sqs a))))
 
-(require racketscript/interop
-         \"./rackt.rkt\")
+(define (Board props . ..)
+  ;; use State Hook instead of explicit constructor
+  ;; choose % prefix arbitrary convention for state
+  ;; TODO: for some reason, components dont update properly when using a Racket vector
+  (define-values (%squares set-%squares!) (use-state ($/new (#js*.Array 9))))
+  (define-values (%XisNext set-%XisNext!) (use-state #t))
+  (define (currentPlayer) (if %XisNext "X" "O"))
+  (define (handleClick i)
+    (define new-squares (#js.%squares.slice))
+    (unless (or (calculateWinner new-squares)
+                (not (equal? ($/typeof ($ new-squares i)) #js"undefined")))
+      ($/:= ($ new-squares i) (currentPlayer))
+      (set-%squares! new-squares)
+      (set-%XisNext! (not %XisNext))))
+  (define (renderSquare i)
+    (<el Square #:props ($/obj [value ($ %squares i)]
+                               [onClick (lambda (_) ; this must have (at least?) 1 arg?
+                                          (handleClick i))])))
+  (define winner (calculateWinner %squares))
+  (define status
+    (if winner
+        (string-append winner " Wins!")
+        (string-append "Current player: " (currentPlayer))))
+  (<el "div"
+       (<el "div" #:props ($/obj [className "status"]) status)
+       (<el "div" #:props ($/obj [className "board-row"])
+            (renderSquare 0)
+            (renderSquare 1)
+            (renderSquare 2))
+       (<el "div" #:props ($/obj [className "board-row"])
+            (renderSquare 3)
+            (renderSquare 4)
+            (renderSquare 5))
+       (<el "div" #:props ($/obj [className "board-row"])
+            (renderSquare 6)
+            (renderSquare 7)
+            (renderSquare 8))))
+;; class Game extends React.Component {
+;;   render() {
+;;     return (
+;;       <div className="game">
+;;         <div className="game-board">
+;;           <Board />
+;;         </div>
+;;         <div className="game-info">
+;;           <div>{/* status */}</div>
+;;           <ol>{/* TODO */}</ol>
+;;         </div>
+;;       </div>
+;;     );
+;;   }
+;; }
 
-(define StateContext (create-context))
+(define (Game props. ..)
+  (<el "div" #:props ($/obj [className "game"])
+       (<el "div" #:props ($/obj [className "game-board"])
+            (<el Board))
+       (<el "div" #:props ($/obj [className "game-info"])
+            (<el "div" #;(status))
+            #;(ol))))
 
-(define (add-todo state action)
-    (append ($ state 'todos) (list ($ action 'todo))))
+;; // ========================================
 
-(define (remove-todo state action)
-    (filter (lambda (el) (not (eq? ($ el 'id) ($ action 'id)))) ($ state 'todos)))
+;; ReactDOM.render(
+;;   <Game />,
+;;   document.getElementById('root')
+;; );
+(render (<el Game) "root")
 
-(define (reducer state action)
-    (cond
-        [(eq? ($ action 'type) \"add\")
-            ($/obj [ todos (add-todo state action)])]
-        [(eq? ($ action 'type) \"remove\")
-            ($/obj [ todos (remove-todo state action)])]
-        [else state]))
-
-(define (todo-input props . ..)
-    (define ctx (use-context StateContext))
-    (define dispatch ($ ctx 'dispatch))
-    (define store ($ ctx 'store))
-    (define-values (text set-text) (use-state \"\"))
-
-    (define (update-text e)
-        (set-text (js-string->string ($ e 'target 'value)) text))
-
-    (define (submit-todo e)
-        (($ e 'preventDefault))
-        (dispatch ($/obj [ type \"add\" ]
-                       [ todo ($/obj [ id (#js*.Date.now) ]
-                                     [ text text ])]))
-
-    (set-text \"\"))
-
-    (<el \"form\"
-         #:props ($/obj [ onSubmit submit-todo ])
-            (<el \"input\"
-                #:props ($/obj [ className \"todo-input\" ]
-                               [ placeholder \"What needs to be done?\" ]
-                               [ value text ]
-                               [ onChange update-text]))))
-
-(define (todo-item props . ..)
-    (define ctx (use-context StateContext))
-    (define dispatch ($ ctx 'dispatch))
-    (define (remove-todo id)
-        (dispatch ($/obj [ type \"remove\" ]
-                         [ id ($ props 'todo 'id) ])))
-
-    (<el \"li\"
-        #:props ($/obj [ className \"todo-item\"])
-            ($ props 'todo 'text)
-            (<el \"button\"
-                #:props ($/obj [ type \"button\" ]
-                            [ className \"button button-clear todo-remove-button\"]
-                            [ onClick remove-todo ])
-                \"x\")))
-
-(define (todo-list props . ..)
-    (define ctx (use-context StateContext))
-    (define dispatch ($ ctx 'dispatch))
-    (define store ($ ctx 'store))
-
-    (<el \"ul\"
-         (map (lambda (todo) (<el todo-item #:props ($/obj [todo todo]))) ($ store 'todos))))
-
-(define (todo-app props . ..)
-    (define provider ($ StateContext 'Provider))
-    (define default-state ($/obj [todos (list)]))
-    (define-values (store dispatch) (use-reducer reducer default-state))
-
-    (<el provider
-        #:props ($/obj [ value
-            ($/obj [ store store ]
-                   [ dispatch dispatch ])])
-        (<el \"div\"
-            (<el todo-input))
-            (<el todo-list)))
-
-(provide todo-app)
-")
-
-(define counter-source-code "(define (counter props ..)
-    (define-values (counter set-counter) (use-state 0))
-
-    (<el \"div\"
-        (<el \"button\"
-            #:props ($/obj [ className \"button\" ]
-                   [ type \"button\" ]
-                   [onClick (lambda (_) (set-counter (- counter 1)))])
-            \"- 1\")
-
-        (<el \"span\" #:props ($/obj [ className \"counter\" ]) counter)
-
-        (<el \"button\"
-            #:props ($/obj [ className \"button\" ]
-                   [ type \"button\" ]
-                   [onClick (lambda (_) (set-counter (+ counter 1)))])
-            \"+ 1\")))")
-
-(render (<el app) "root")
+;(render (<el app) "root")
 
 
