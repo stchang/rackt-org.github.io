@@ -87,27 +87,26 @@
       (2 4 6)))
   (for/or ([L LINES])
     (match-define (list a b c) L)
-    (and (not (equal? ($/typeof ($ sqs a)) #js"undefined"))
-         (equal? ($ sqs a) ($ sqs b))
-         (equal? ($ sqs b) ($ sqs c))
-         ($ sqs a))))
+    (and (equal? (vector-ref sqs a) (vector-ref sqs b))
+         (equal? (vector-ref sqs b) (vector-ref sqs c))
+         (vector-ref sqs a))))
 
 (define (Board props . ..)
-  ;; use State Hook instead of explicit constructor
-  ;; choose % prefix arbitrary convention for state
+  ;; use State Hook instead of explicit class constructor
+  ;; use (arbitrary) "%" prefix convention for values created with use-state
   ;; TODO: for some reason, components dont update properly when using a Racket vector
-  (define-values (%squares set-%squares!) (use-state ($/new (#js*.Array 9))))
+  ;; - probably because the pointer to vector stays the same?
+  ;; - UPDATE: after adding %XisNext state component, it updates properly now
+  (define-values (%squares set-%squares!) (use-state (vector #f #f #f #f #f #f #f #f #f)))
   (define-values (%XisNext set-%XisNext!) (use-state #t))
   (define (currentPlayer) (if %XisNext "X" "O"))
   (define (handleClick i)
-    (define new-squares (#js.%squares.slice))
-    (unless (or (calculateWinner new-squares)
-                (not (equal? ($/typeof ($ new-squares i)) #js"undefined")))
-      ($/:= ($ new-squares i) (currentPlayer))
-      (set-%squares! new-squares)
+    (unless (or (calculateWinner %squares)
+                (vector-ref %squares i))
+      (vector-set! %squares i (currentPlayer))
       (set-%XisNext! (not %XisNext))))
   (define (renderSquare i)
-    (<el Square #:props ($/obj [value ($ %squares i)]
+    (<el Square #:props ($/obj [value (vector-ref %squares i)]
                                [onClick (lambda (_) ; this must have (at least?) 1 arg?
                                           (handleClick i))])))
   (define winner (calculateWinner %squares))
