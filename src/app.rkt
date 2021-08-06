@@ -5,7 +5,7 @@
 ;; import React from 'react';
 ;; import ReactDOM from 'react-dom';
 ;; import './index.css';
-(require ;racket/vector
+(require (for-syntax racket/base syntax/parse)
          racket/match
          rackt)
 
@@ -75,47 +75,61 @@
 ;;   }
 ;;   return null;
 ;; }
-(define (calculateWinner sqs)
-  (define LINES
-    '((0 1 2)
-      (3 4 5)
-      (6 7 8)
-      (0 3 6)
-      (1 4 7)
-      (2 5 8)
-      (0 4 8)
-      (2 4 6)))
+
+(define _board (vector #f #f #f #f #f #f #f #f #f))
+
+;; TODO: components dont update properly when using a Racket vector as the board
+;;       (because the pointer to vector stays the same?)
+;; - UPDATE: use %XisNext state component to trigger update,
+;;           so now vector is ok
+(define-syntax BOARD
+  (syntax-parser
+    [:id #'_board]
+    [(_ i) #'(vector-ref _board i)]
+    [(_ i (~datum =) v) #'(vector-set! _board i v)]))
+
+(define LINES
+  '((0 1 2)
+    (3 4 5)
+    (6 7 8)
+    (0 3 6)
+    (1 4 7)
+    (2 5 8)
+    (0 4 8)
+    (2 4 6)))
+
+(define (calculateWinner)
   (for/or ([L LINES])
     (match-define (list a b c) L)
-    (and (equal? (vector-ref sqs a) (vector-ref sqs b))
-         (equal? (vector-ref sqs b) (vector-ref sqs c))
-         (vector-ref sqs a))))
+    (and (equal? (BOARD a) (BOARD b))
+         (equal? (BOARD b) (BOARD c))
+         (BOARD a))))
 
 (define (Board props . ..)
   ;; use State Hook instead of explicit class constructor
   ;; use (arbitrary) "%" prefix convention for values created with use-state
-  ;; TODO: for some reason, components dont update properly when using a Racket vector
-  ;; - probably because the pointer to vector stays the same?
-  ;; - UPDATE: after adding %XisNext state component, it updates properly now
-  (define-values (%squares set-%squares!) (use-state (vector #f #f #f #f #f #f #f #f #f)))
+  ;; This must be in Board to trigger updates
   (define-values (%XisNext set-%XisNext!) (use-state #t))
+
   (define (currentPlayer) (if %XisNext "X" "O"))
+
   (define (handleClick i)
-    (unless (or (calculateWinner %squares)
-                (vector-ref %squares i))
-      (vector-set! %squares i (currentPlayer))
+    (unless (or (calculateWinner) (BOARD i))
+      (BOARD i = (currentPlayer))
       (set-%XisNext! (not %XisNext))))
+
   (define (renderSquare i)
-    (<el Square #:props ($/obj [value (vector-ref %squares i)]
+    (<el Square #:props ($/obj [value (BOARD i)]
                                [onClick (lambda (_) ; this must have (at least?) 1 arg?
                                           (handleClick i))])))
-  (define winner (calculateWinner %squares))
-  (define status
-    (if winner
-        (string-append winner " Wins!")
-        (string-append "Current player: " (currentPlayer))))
+
+  (define winner (calculateWinner))
+
   (<el "div"
-       (<el "div" #:props ($/obj [className "status"]) status)
+       (<el "div" #:props ($/obj [className "status"])
+            (if winner
+                (string-append winner " Wins!")
+                (string-append "Current player: " (currentPlayer))))
        (<el "div" #:props ($/obj [className "board-row"])
             (renderSquare 0)
             (renderSquare 1)
@@ -128,6 +142,7 @@
             (renderSquare 6)
             (renderSquare 7)
             (renderSquare 8))))
+
 ;; class Game extends React.Component {
 ;;   render() {
 ;;     return (
